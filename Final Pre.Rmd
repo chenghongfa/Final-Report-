@@ -1,0 +1,103 @@
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# After the attacking from the virus
+
+## Analysis of the confirmed people
+
+- Figure out which kind of people are the most vulnerable to this COVID19
+- Divide the age variables into several intervals
+
+```{r echo=FALSE, warning=TRUE}
+a = read.csv('PatientInfo.csv')
+
+
+library("survival")
+library("survminer")
+data('lung')
+library('coin')
+library('party')
+
+
+a = a[1:794,]
+age = as.numeric(unlist(strsplit(as.character(a$age), split = 's')))
+D = data.frame(date = a$confirmed_date, status = rep(1, nrow(a)))
+
+D$date = as.Date(as.character(D$date))
+D$date = D$date - D$date[1]
+D$age = cut(age, breaks = c(0, 40, 50, 60, 70, 80, Inf))
+D$sex = factor(as.character(a$sex))
+```
+The prepared dataset is following:
+```{r}
+head(D)
+```
+
+
+- We consider the comfirmed cases.
+- log-rank test for different groups of people.
+- The p value is smaller than 0.05, which means that there is differences in these groups.
+
+## Log-rank test
+
+```{r}
+D = D[complete.cases(D),]
+
+fit = survfit(Surv(date, status) ~ sex + age, data = D)
+summary(fit)$table
+ggsurvplot(fit, data = D, pval = TRUE)
+```
+
+
+- Visualization of cumulative function of different group people.
+
+```{r echo=FALSE}
+ggsurv <- ggsurvplot(fit, fun = "event", conf.int = TRUE,
+                     ggtheme = theme_bw())
+
+## Get the different plots for these events
+ggsurv$plot +theme_bw() + 
+  theme (legend.position = "right")+
+  facet_grid(age~sex)
+```
+
+## Cox model
+
+- For exact comparison of the risk to be affected by the CVOD of different groups, Cox model is a good choice.
+
+- From the cox model, we can see that there is one significant people within certain age interval suffers significant risk from other people.
+
+```{r echo=FALSE}
+fit.coxph <- coxph(Surv(time, status) ~ sex + age, 
+                   data = D)
+summary(fit.coxph)
+ggforest(fit.coxph, data = D)
+
+```
+
+
+- Model checking about the cox model fitness.
+- The martingale residuals seems that they have 0 means, indicating that overall the model fits the data reasonably well.
+```{r echo=FALSE}
+
+
+layout(matrix(1:2, ncol = 2))
+ res <- residuals(fit.coxph)
+ plot(res ~ age, data = D, ylim = c(-2.5, 1.5),
+         pch = ".", ylab = "Martingale Residuals")
+ abline(h = 0, lty = 3)
+ plot(res ~ sex, data = D, ylim = c(-2.5, 1.5),
+         pch = ".", ylab = "")
+ abline(h = 0, lty = 3)
+
+
+```
+
+
+
+# God bless our nation. Rid us of mutation.
+## Thank You
